@@ -60,7 +60,7 @@ def main():
         # Parameters of newly constructed modules have requires_grad=True by default
         # Final dense layer needs to replaced with the previous out chans, and number of classes
         # in this case -- resnet 101 - it's 2048 with two classes (cats and dogs)
-        model.fc = nn.Linear(2048, 2)
+        model.fc = nn.Linear(2048, 7)
 
     else:
         print("=> creating model '{}'".format(args.arch))
@@ -70,6 +70,7 @@ def main():
         model.features = torch.nn.DataParallel(model.features)
         model.cuda()
     else:
+        #model.cuda()
         model = torch.nn.DataParallel(model).cuda()
     # optionally resume from a checkpoint
     if args.resume:
@@ -95,6 +96,7 @@ def main():
     train_loader = data.DataLoader(
         datasets.ImageFolder(traindir,
                              transforms.Compose([
+                                 transforms.Scale(240),
                                  transforms.RandomSizedCrop(224),
                                  transforms.RandomHorizontalFlip(),
                                  transforms.ToTensor(),
@@ -108,7 +110,7 @@ def main():
     val_loader = data.DataLoader(
         datasets.ImageFolder(valdir,
                              transforms.Compose([
-                                 transforms.Scale(256),
+                                 transforms.Scale(240),
                                  transforms.CenterCrop(224),
                                  transforms.ToTensor(),
                                  normalize,
@@ -121,7 +123,7 @@ def main():
     test_loader = data.DataLoader(
         TestImageFolder(testdir,
                         transforms.Compose([
-                            transforms.Scale(256),
+                            transforms.Scale(240),
                             transforms.CenterCrop(224),
                             transforms.ToTensor(),
                             normalize,
@@ -133,7 +135,7 @@ def main():
 
     if args.test:
         print("Testing the model and generating a output csv for submission")
-        test(test_loader, model)
+        test(test_loader, train_loader.dataset.class_to_idx, model)
         return
     # define loss function (criterion) and pptimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -248,36 +250,46 @@ def validate(val_loader, model, criterion):
     return acc.avg
 
 
-def test(test_loader, model):
+def test(test_loader, class_to_idx, model):
     csv_map = {}
     # switch to evaluate mode
     model.eval()
     for i, (images, filepath) in enumerate(test_loader):
         # pop extension, treat as id to map
-        filepath = os.path.splitext(os.path.basename(filepath[0]))[0]
-        filepath = int(filepath)
+        #filepath = os.path.splitext(os.path.basename(filepath[0]))[0]
+        #filepath = int(filepath)
 
         image_var = torch.autograd.Variable(images, volatile=True)
         y_pred = model(image_var)
         # get the index of the max log-probability
         smax = nn.Softmax()
         smax_out = smax(y_pred)[0]
-        cat_prob = smax_out.data[0]
-        dog_prob = smax_out.data[1]
-        prob = dog_prob
-        if cat_prob > dog_prob:
-            prob = 1 - cat_prob
-        prob = np.around(prob, decimals=4)
-        prob = np.clip(prob, .0001, .999)
-        csv_map[filepath] = prob
-        # print("{},{}".format(filepath, prob))
+        
+        angry_prob = smax_out.data[class_to_idx['Angry']]
+        disgust_prob = smax_out.data[class_to_idx['Disgust']]
+        fear_prob = smax_out.data[class_to_idx['Fear']]
+        happy_prob = smax_out.data[class_to_idx['Happy']]
+        neutral_prob = smax_out.data[class_to_idx['Neutral']]
+        sad_prob = smax_out.data[class_to_idx['Sad']]
+        surprise_prob = smax_out.data[class_to_idx['Surprise']]
+                
+        
+        #cat_prob = smax_out.data[0]
+        #dog_prob = smax_out.data[1]
+        #prob = dog_prob
+        #if cat_prob > dog_prob:
+            #prob = 1 - cat_prob
+        #prob = np.around(prob, decimals=4)
+        #prob = np.clip(prob, .0001, .999)
+        csv_map[filepath] = [angry_prob, disgust_prob, fear_prob, happy_prob, neutral_prob, sad_prob, surprise_prob]
+        print(filepath, {"Angry" : angry_prob, "Disgust" : disgust_prob, "Fear" : fear_prob, "Happy": happy_prob, "Neutral" : neutral_prob, "Sad" : sad_prob, "Surprise" : surprise_prob})
 
-    with open(os.path.join(args.data, 'entry.csv'), 'wb') as csvfile:
-        fieldnames = ['id', 'label']
+    with open(os.path.join(args.data, 'entry.csv'), 'w') as csvfile:
         csv_w = csv.writer(csvfile)
-        csv_w.writerow(('id', 'label'))
+        csv_w.writerow(('id', 'Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise'))
         for row in sorted(csv_map.items()):
-            csv_w.writerow(row)
+            csv_w.writerow( tuple((row[0]+','+str(','.join([str(a) for a in row[1]]))).split(',')) )
+
 
     return
 
@@ -333,10 +345,22 @@ def accuracy(y_pred, y_actual, topk=(1, )):
 
 class TestImageFolder(data.Dataset):
     def __init__(self, root, transform=None):
+        #images = []
+        #for filename in os.listdir(root):
+            #if filename.endswith('jpg'):
+                #images.append('{}'.format(filename))
+
         images = []
-        for filename in os.listdir(root):
-            if filename.endswith('jpg'):
-                images.append('{}'.format(filename))
+        for target in sorted(os.listdir(root)):
+            d = os.path.join(root, target)
+            if not os.path.isdir(d):
+                continue
+
+            for r, _, fnames in sorted(os.walk(d)):
+                for fname in sorted(fnames):
+                    if fname.endswith('jpg'):
+                        path = os.path.join(r, fname)
+                        images.append('{}'.format(path))
 
         self.root = root
         self.imgs = images
@@ -344,7 +368,8 @@ class TestImageFolder(data.Dataset):
 
     def __getitem__(self, index):
         filename = self.imgs[index]
-        img = Image.open(os.path.join(self.root, filename))
+        img = Image.open(filename)
+        img = img.convert('RGB')
         if self.transform is not None:
             img = self.transform(img)
         return img, filename

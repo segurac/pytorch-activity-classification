@@ -252,8 +252,13 @@ def validate(val_loader, model, criterion):
 
 def test(test_loader, class_to_idx, model):
     csv_map = {}
+    csv2_map = {}
+    
     # switch to evaluate mode
     model.eval()
+    old_sbj_id = ""
+    acc_probs = np.zeros(7)
+    ncount = 0
     for i, (images, filepath) in enumerate(test_loader):
         # pop extension, treat as id to map
         #filepath = os.path.splitext(os.path.basename(filepath[0]))[0]
@@ -282,13 +287,35 @@ def test(test_loader, class_to_idx, model):
         #prob = np.around(prob, decimals=4)
         #prob = np.clip(prob, .0001, .999)
         csv_map[filepath] = [angry_prob, disgust_prob, fear_prob, happy_prob, neutral_prob, sad_prob, surprise_prob]
-        print(filepath, {"Angry" : angry_prob, "Disgust" : disgust_prob, "Fear" : fear_prob, "Happy": happy_prob, "Neutral" : neutral_prob, "Sad" : sad_prob, "Surprise" : surprise_prob})
+        #print(filepath, {"Angry" : angry_prob, "Disgust" : disgust_prob, "Fear" : fear_prob, "Happy": happy_prob, "Neutral" : neutral_prob, "Sad" : sad_prob, "Surprise" : surprise_prob})
+
+        sbj_id = str(filepath).strip().split('/')[-1].split('_')[0]
+        if sbj_id != old_sbj_id:
+            if old_sbj_id != "":
+                acc_probs = acc_probs / ncount
+                
+                csv2_map[filepath] = acc_probs.tolist()
+                print(filepath, acc_probs.tolist())
+            acc_probs = np.array([angry_prob, disgust_prob, fear_prob, happy_prob, neutral_prob, sad_prob, surprise_prob])
+            ncount = 1
+        else:
+            acc_probs = acc_probs + np.array([angry_prob, disgust_prob, fear_prob, happy_prob, neutral_prob, sad_prob, surprise_prob])
+            ncount = ncount +1
+            
+        old_sbj_id = sbj_id
+            
+    with open(os.path.join(args.data, 'entry2.csv'), 'w') as csvfile:
+        csv_w = csv.writer(csvfile)
+        csv_w.writerow(('id', 'Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise'))
+        for row in sorted(csv2_map.items()):
+            csv_w.writerow( tuple((str(row[0])+','+str(','.join([str(a) for a in row[1]]))).split(',')) )
+
 
     with open(os.path.join(args.data, 'entry.csv'), 'w') as csvfile:
         csv_w = csv.writer(csvfile)
         csv_w.writerow(('id', 'Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise'))
         for row in sorted(csv_map.items()):
-            csv_w.writerow( tuple((row[0]+','+str(','.join([str(a) for a in row[1]]))).split(',')) )
+            csv_w.writerow( tuple((str(row[0])+','+str(','.join([str(a) for a in row[1]]))).split(',')) )
 
 
     return

@@ -20,6 +20,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 
 model_names = sorted(name for name in models.__dict__ if name.islower() and not name.startswith("__"))
+model_names.append('VGG_FACE')
 
 parser = argparse.ArgumentParser(description='PyTorch Cats vs Dogs fine-tuning example')
 parser.add_argument('data', metavar='DIR', help='path to dataset')
@@ -50,28 +51,44 @@ def main():
     args = parser.parse_args()
 
     # create model
-    if args.pretrained:
-        print("=> using pre-trained model '{}'".format(args.arch))
-        model = models.__dict__[args.arch](pretrained=True)
-        # Don't update non-classifier learned features in the pretrained networks
+    if args.arch != "VGG_FACE":
+        if args.pretrained:
+            print("=> using pre-trained model '{}'".format(args.arch))
+            model = models.__dict__[args.arch](pretrained=True)
+            # Don't update non-classifier learned features in the pretrained networks
+            for param in model.parameters():
+                param.requires_grad = False
+            # Replace the last fully-connected layer
+            # Parameters of newly constructed modules have requires_grad=True by default
+            # Final dense layer needs to replaced with the previous out chans, and number of classes
+            # in this case -- resnet 101 - it's 2048 with two classes (cats and dogs)
+            model.fc = nn.Linear(2048, 7)
+
+        else:
+            print("=> creating model '{}'".format(args.arch))
+            model = models.__dict__[args.arch]()
+
+        if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
+            model.features = torch.nn.DataParallel(model.features)
+            model.cuda()
+        else:
+            #model.cuda()
+            model = torch.nn.DataParallel(model).cuda()
+    else:
+        import VGG_FACE
+        model = VGG_FACE.VGG_FACE
+        model.load_state_dict(torch.load('VGG_FACE.pth'))
         for param in model.parameters():
             param.requires_grad = False
-        # Replace the last fully-connected layer
-        # Parameters of newly constructed modules have requires_grad=True by default
-        # Final dense layer needs to replaced with the previous out chans, and number of classes
-        # in this case -- resnet 101 - it's 2048 with two classes (cats and dogs)
-        model.fc = nn.Linear(2048, 7)
-
-    else:
-        print("=> creating model '{}'".format(args.arch))
-        model = models.__dict__[args.arch]()
-
-    if args.arch.startswith('alexnet') or args.arch.startswith('vgg'):
-        model.features = torch.nn.DataParallel(model.features)
-        model.cuda()
-    else:
-        #model.cuda()
+        list_model = list(model.children())
+        del list_model[-1] #delete softmax
+        list_model[-1] =  torch.nn.Sequential(VGG_FACE.Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),torch.nn.Linear(4096,64))
+        list_model.append(  nn.ReLU() )
+        list_model.append(  nn.Dropout(0.5) )
+        list_model.append( torch.nn.Sequential(VGG_FACE.Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),torch.nn.Linear(64,7)) )
+        model =  nn.Sequential(*list_model)
         model = torch.nn.DataParallel(model).cuda()
+
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
@@ -140,7 +157,9 @@ def main():
     # define loss function (criterion) and pptimizer
     criterion = nn.CrossEntropyLoss().cuda()
 
-    optimizer = optim.Adam(model.module.fc.parameters(), args.lr, weight_decay=args.weight_decay)
+    #optimizer = optim.Adam(model.module.fc.parameters(), args.lr, weight_decay=args.weight_decay)
+    optimizer = optim.Adam( filter(lambda p: p.requires_grad, model.parameters()) , args.lr, weight_decay=args.weight_decay)
+    
 
     if args.evaluate:
         validate(val_loader, model, criterion)
@@ -294,8 +313,8 @@ def test(test_loader, class_to_idx, model):
             if old_sbj_id != "":
                 acc_probs = acc_probs / ncount
                 
-                csv2_map[filepath] = acc_probs.tolist()
-                print(filepath, acc_probs.tolist())
+                csv2_map[old_sbj_id] = acc_probs.tolist()
+                print(old_sbj_id, acc_probs.tolist())
             acc_probs = np.array([angry_prob, disgust_prob, fear_prob, happy_prob, neutral_prob, sad_prob, surprise_prob])
             ncount = 1
         else:

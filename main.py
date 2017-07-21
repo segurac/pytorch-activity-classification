@@ -202,9 +202,11 @@ def train(train_loader, model, criterion, optimizer, epoch):
         target = target.cuda(async=True)
         image_var = torch.autograd.Variable(images)
         label_var = torch.autograd.Variable(target)
+        print(label_var)
 
         # compute y_pred
         y_pred = model(image_var)
+        print(y_pred)
         loss = criterion(y_pred, label_var)
 
         # measure accuracy and record loss

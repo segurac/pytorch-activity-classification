@@ -54,7 +54,8 @@ class Vgg_face_sequence_model(nn.Module):
                 #for p in m.parameters():
                     #p.requires_grad=False
                     
-        self.rnn = nn.RNN(64, nhid, nlayers, dropout=dropout, batch_first = True, bidirectional = False)
+        #self.rnn = nn.RNN(64, nhid, nlayers, dropout=dropout, batch_first = True, bidirectional = False)
+        self.rnn = nn.RNN(64, nhid, nlayers, batch_first = True, bidirectional = False)
         self.classifier = nn.Linear(nhid,7)
         
         self.rnn_nhid = nhid
@@ -71,7 +72,8 @@ class Vgg_face_sequence_model(nn.Module):
         
         features = []
         for s in range(4):
-            input_slice = inputs.narrow(1,s,1).contiguous().view(-1,3,224,224).cuda()
+            #input_slice = inputs.narrow(1,s,1).contiguous().view(-1,3,224,224).cuda()
+            input_slice = inputs[:,s,:,:,:].cuda()
             print("input_slice " , input_slice.size())
             slice_features = self.vgg_face(input_slice)
             print("slice features " , slice_features.size())
@@ -83,14 +85,19 @@ class Vgg_face_sequence_model(nn.Module):
 
         ## feed to the RNN
         output, hidden = self.rnn(features, hidden)
-        print(output.size())        
+        print("output", output.size())   
+        print("output[:,-1,:]", output[:,-1,:].size())
         
-        output = self.classifier(output[-1])
+        
+        
+        output = self.classifier(output[:,-1,:])
+        print("output", output.size())
         return output
       
     def init_hidden(self, bsz):
-        hidden = (Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)),
-                Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)))
+        #hidden = (Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)),
+                #Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)))
+        hidden = Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)).cuda()
         return hidden
       
         #weight = next(self.parameters()).data

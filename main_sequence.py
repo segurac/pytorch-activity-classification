@@ -55,9 +55,9 @@ def main():
 
     # create model
     if args.resume2:
-        model = seq_model.Vgg_face_sequence_model(nhid=4, nlayers=1, dropout=0.5, pretrained_model_path = args.resume2)
+        model = seq_model.Vgg_face_sequence_model(nhid=128, nlayers=1, dropout=0.5, pretrained_model_path = args.resume2)
     else:
-        model = seq_model.Vgg_face_sequence_model(nhid=4, nlayers=1, dropout=0.5)
+        model = seq_model.Vgg_face_sequence_model(nhid=128, nlayers=1, dropout=0.5)
     #model = torch.nn.DataParallel(model).cuda()
     model = model.cuda()
 
@@ -174,14 +174,18 @@ def train(train_loader, model, criterion, optimizer, epoch):
         # measure data loading time
         data_time.update(time.time() - end)
 
+        target = target[:,0]
         target = target.cuda(async=True)
         #print(images)
         image_var = torch.autograd.Variable(images)
         label_var = torch.autograd.Variable(target)
         hidden = model.init_hidden(args.batch_size)
+        #print(label_var)
+        #label_var + "hola"
 
         # compute y_pred
         y_pred = model(image_var, hidden)
+        #print(y_pred)
         loss = criterion(y_pred, label_var)
 
         # measure accuracy and record loss

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torchvision.models as models
 import VGG_FACE
 from torch.autograd import Variable
-
+import gc
 
 class Vgg_face_sequence_model(nn.Module):
 
@@ -22,7 +22,7 @@ class Vgg_face_sequence_model(nn.Module):
         list_model.append( torch.nn.Sequential(VGG_FACE.Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),torch.nn.Linear(64,7)) )
         model =  nn.Sequential(*list_model)
         #model = torch.nn.DataParallel(model).cuda()
-        self.vgg_face = model.cuda()
+        self.vgg_face = model
         model = None
         list_model = None
         print(self.vgg_face)
@@ -71,13 +71,17 @@ class Vgg_face_sequence_model(nn.Module):
         seq_length = inputs.size()[1]
         
         features = []
-        for s in range(4):
+        for s in range(12):
             #input_slice = inputs.narrow(1,s,1).contiguous().view(-1,3,224,224).cuda()
-            input_slice = inputs[:,s,:,:,:].cuda()
+            #input_slice = inputs[:,s,:,:,:].cuda()
+            input_slice = inputs[:,s,:,:,:]
+            input_slice = torch.autograd.Variable(input_slice).cuda()
             print("input_slice " , input_slice.size())
             slice_features = self.vgg_face(input_slice)
             print("slice features " , slice_features.size())
             features.append(slice_features)
+            
+        #gc.collect()
         
         ## concatenate in (batch, sequence, features)
         features = torch.stack(features, dim=1)
@@ -92,12 +96,13 @@ class Vgg_face_sequence_model(nn.Module):
         
         output = self.classifier(output[:,-1,:])
         print("output", output.size())
+        #gc.collect()
         return output
       
     def init_hidden(self, bsz):
         #hidden = (Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)),
                 #Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)))
-        hidden = Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)).cuda()
+        hidden = Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid))
         return hidden
       
         #weight = next(self.parameters()).data

@@ -49,6 +49,9 @@ parser.add_argument('--pretrained', dest='pretrained', action='store_true', help
 best_prec1 = 0
 
 
+USE_CUDA=True
+
+
 def main():
     global args, best_prec1
     args = parser.parse_args()
@@ -59,7 +62,8 @@ def main():
     else:
         model = seq_model.Vgg_face_sequence_model(nhid=128, nlayers=1, dropout=0.5)
     #model = torch.nn.DataParallel(model).cuda()
-    model = model.cuda()
+    if USE_CUDA:
+        model = model.cuda()
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -97,7 +101,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.workers,
-        pin_memory=True, collate_fn=data_load.my_collate)
+        pin_memory=False, collate_fn=data_load.my_collate)
 
     val_loader = data.DataLoader(
         data_load.ImageFolderSequences(valdir,
@@ -130,7 +134,9 @@ def main():
         test(test_loader, train_loader.dataset.class_to_idx, model)
         return
     # define loss function (criterion) and pptimizer
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = nn.CrossEntropyLoss()
+    if USE_CUDA:
+        criterion.cuda()
 
     #optimizer = optim.Adam(model.module.fc.parameters(), args.lr, weight_decay=args.weight_decay)
     optimizer = optim.Adam( filter(lambda p: p.requires_grad, model.parameters()) , args.lr, weight_decay=args.weight_decay)
@@ -165,21 +171,27 @@ def train(train_loader, model, criterion, optimizer, epoch):
     data_time = AverageMeter()
     losses = AverageMeter()
     acc = AverageMeter()
-
+    
+    #import tracemalloc
+    #tracemalloc.start()
     # switch to train mode
     model.train()
-
+    
     end = time.time()
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
 
         target = target[:,0]
-        target = target.cuda(async=True)
+        if USE_CUDA:
+            target = target.cuda(async=True)
         #print(images)
-        image_var = torch.autograd.Variable(images)
+        #image_var = torch.autograd.Variable(images)
+        image_var = images
         label_var = torch.autograd.Variable(target)
         hidden = model.init_hidden(args.batch_size)
+        if USE_CUDA:
+            hidden = hidden.cuda()
         #print(label_var)
         #label_var + "hola"
 
@@ -201,6 +213,15 @@ def train(train_loader, model, criterion, optimizer, epoch):
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
+        
+        #snapshot = tracemalloc.take_snapshot()
+        #stats_file = open('stats.txt','w')
+        #top_stats = snapshot.statistics('lineno')
+        #for ts in top_stats:
+            #stats_file.write(str(ts))
+            #stats_file.write('\n')
+        #stats_file.close()
+        #return
 
         if i % args.print_freq == 0:
             print('Epoch: [{0}][{1}/{2}]\t'

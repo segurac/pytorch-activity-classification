@@ -21,8 +21,8 @@ class Vgg_face_sequence_model(nn.Module):
         list_model.append(  nn.Dropout(0.5) )
         list_model.append( torch.nn.Sequential(VGG_FACE.Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),torch.nn.Linear(64,7)) )
         model =  nn.Sequential(*list_model)
-        #model = torch.nn.DataParallel(model).cuda()
-        self.vgg_face = model
+        self.vgg_face = torch.nn.DataParallel(model).cuda()
+        #self.vgg_face = model
         model = None
         list_model = None
         print(self.vgg_face)
@@ -37,8 +37,8 @@ class Vgg_face_sequence_model(nn.Module):
 
 
         ## remove last fully-connected layer
-        model = nn.Sequential(*list(self.vgg_face.children())[:-1])
-        #model = nn.Sequential(*list(next(self.vgg_face.children()).children())[:-1])
+        #model = nn.Sequential(*list(self.vgg_face.children())[:-1])
+        model = nn.Sequential(*list(next(self.vgg_face.children()).children())[:-1])
         #for c in model.children():
             #c.cuda()
         #model = torch.nn.DataParallel(model).cuda()

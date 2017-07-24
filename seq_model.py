@@ -22,7 +22,7 @@ class Vgg_face_sequence_model(nn.Module):
         list_model.append(  nn.Dropout(0.5) )
         list_model.append( torch.nn.Sequential(VGG_FACE.Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),torch.nn.Linear(64,7)) )
         model =  nn.Sequential(*list_model)
-        self.vgg_face = torch.nn.DataParallel(model).cuda()
+        self.vgg_face = torch.nn.DataParallel(model)
         #self.vgg_face = model
         model = None
         list_model = None
@@ -60,7 +60,8 @@ class Vgg_face_sequence_model(nn.Module):
                     #p.requires_grad=False
                     
         #self.rnn = nn.RNN(64, nhid, nlayers, dropout=dropout, batch_first = True, bidirectional = False)
-        self.rnn = nn.RNN(64, nhid, nlayers, batch_first = True, bidirectional = False)
+        #self.rnn = nn.RNN(64, nhid, nlayers, batch_first = True, bidirectional = False)
+        self.rnn = nn.LSTM(64, nhid, nlayers, batch_first = True, bidirectional = False)
         self.classifier = nn.Linear(nhid,7)
         
         self.rnn_nhid = nhid
@@ -120,9 +121,9 @@ class Vgg_face_sequence_model(nn.Module):
         return output
       
     def init_hidden(self, bsz):
-        #hidden = (Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)),
-                #Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)))
-        hidden = Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid))
+        hidden = (Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)),
+                Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid)))
+        #hidden = Variable(torch.zeros(self.rnn_layers, bsz, self.rnn_nhid))
         return hidden
       
         #weight = next(self.parameters()).data

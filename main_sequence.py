@@ -196,7 +196,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
         label_var = torch.autograd.Variable(target)
         hidden = model.init_hidden(args.batch_size)
         if USE_CUDA:
-            hidden = hidden.cuda()
+            hidden = (hidden[0].cuda(), hidden[1].cuda())
         #print(label_var)
         #label_var + "hola"
 
@@ -263,7 +263,9 @@ def validate(val_loader, model, criterion):
         label_var = torch.autograd.Variable(labels, volatile=True)
         hidden = model.init_hidden(image_var.size()[0])
         if USE_CUDA:
-            hidden = hidden.cuda()
+            #hidden = hidden.cuda()
+            hidden = (hidden[0].cuda(), hidden[1].cuda())
+
         #print(label_var)
         #label_var + "hola"
 

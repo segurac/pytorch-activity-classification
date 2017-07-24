@@ -311,6 +311,7 @@ def test(test_loader, class_to_idx, model):
         #print(filepath, {"Angry" : angry_prob, "Disgust" : disgust_prob, "Fear" : fear_prob, "Happy": happy_prob, "Neutral" : neutral_prob, "Sad" : sad_prob, "Surprise" : surprise_prob})
 
         sbj_id = str(filepath).strip().split('/')[-1].split('_')[0]
+        #sbj_id = str(filepath).strip().split('/')[-2]
         if sbj_id != old_sbj_id:
             if old_sbj_id != "":
                 acc_probs = acc_probs / ncount
@@ -324,7 +325,12 @@ def test(test_loader, class_to_idx, model):
             ncount = ncount +1
             
         old_sbj_id = sbj_id
-            
+    
+    #output scores for the last sbj_id
+    acc_probs = acc_probs / ncount
+    csv2_map[old_sbj_id] = acc_probs.tolist()
+    print(old_sbj_id, acc_probs.tolist())
+    
     with open(os.path.join(args.data, 'entry2.csv'), 'w') as csvfile:
         csv_w = csv.writer(csvfile)
         csv_w.writerow(('id', 'Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise'))

@@ -111,7 +111,7 @@ def main():
                                  transforms.ToTensor(),
                                  normalize,
                              ])),
-        batch_size=args.batch_size,
+        batch_size=int(args.batch_size/1),
         shuffle=True,
         num_workers=args.workers,
         pin_memory=True, collate_fn=data_load.my_collate)
@@ -177,6 +177,11 @@ def train(train_loader, model, criterion, optimizer, epoch):
     # switch to train mode
     model.train()
     
+    soft_batch = 3
+    #acc_loss = 0
+    optimizer.zero_grad()
+
+    
     end = time.time()
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
@@ -206,9 +211,15 @@ def train(train_loader, model, criterion, optimizer, epoch):
         acc.update(prec1[0], images.size(0))
 
         # compute gradient and do SGD step
-        optimizer.zero_grad()
+        #optimizer.zero_grad()
         loss.backward()
-        optimizer.step()
+        #optimizer.step()
+        
+        if (i+1) % soft_batch == 0:
+            print("Optimizing parameters")
+            optimizer.step()
+            acc_loss = 0
+            optimizer.zero_grad()
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -242,12 +253,22 @@ def validate(val_loader, model, criterion):
 
     end = time.time()
     for i, (images, labels) in enumerate(val_loader):
-        labels = labels.cuda(async=True)
-        image_var = torch.autograd.Variable(images, volatile=True)
+        
+        labels = labels[:,0]
+        if USE_CUDA:
+            labels = labels.cuda(async=True)
+        #print(images)
+        #image_var = torch.autograd.Variable(images)
+        image_var = images
         label_var = torch.autograd.Variable(labels, volatile=True)
+        hidden = model.init_hidden(image_var.size()[0])
+        if USE_CUDA:
+            hidden = hidden.cuda()
+        #print(label_var)
+        #label_var + "hola"
 
         # compute y_pred
-        y_pred = model(image_var)
+        y_pred = model(image_var, hidden)
         loss = criterion(y_pred, label_var)
 
         # measure accuracy and record loss

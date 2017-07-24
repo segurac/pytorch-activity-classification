@@ -158,14 +158,19 @@ class ImageFolderSequences(data.Dataset):
             frame_index = imagepath_to_frame_index(path)
             if self.target_transform is not None:
                 frame_index = self.target_transform( frame_index )
-                
-            while sequence_index < frame_index: 
-                sequence_index_tmp = sequence_index
-                if self.target_transform is not None:
-                    sequence_index_tmp = self.target_transform( sequence_index_tmp )
-                good_image = False
-                images.append([ self.pad_image, sequence_index_tmp, good_image])
-                sequence_index = sequence_index +1
+            if sequence_index > 0:
+                count_pad=0
+                while sequence_index < frame_index: 
+                    sequence_index_tmp = sequence_index
+                    if self.target_transform is not None:
+                        sequence_index_tmp = self.target_transform( sequence_index_tmp )
+                    good_image = False
+                    images.append([ self.pad_image, sequence_index_tmp, good_image])
+                    sequence_index = sequence_index +1
+                    count_pad=count_pad+1
+                    if count_pad > 5:
+                        sequence_index = frame_index
+                        break
 
             good_image = True    
             images.append([img,frame_index, good_image])

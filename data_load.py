@@ -168,7 +168,7 @@ class ImageFolderSequences(data.Dataset):
                     images.append([ self.pad_image, sequence_index_tmp, good_image])
                     sequence_index = sequence_index +1
                     count_pad=count_pad+1
-                    if count_pad > 5:
+                    if count_pad > 1:
                         sequence_index = frame_index
                         break
 
@@ -192,8 +192,6 @@ def my_collate(batch):
         nphotos = len(_prueba_batch[n][0])
         if nphotos > max_length:
             max_length = nphotos
-#         print(nphotos)
-#     print(max_length)
 
     data_tensor = torch.FloatTensor(
         len(_prueba_batch), 
@@ -206,11 +204,11 @@ def my_collate(batch):
 
     for n in range(len(_prueba_batch)):
         nphotos = len(_prueba_batch[n][0])
-        photos_tensor = torch.FloatTensor(max_length,
-                                        (_prueba_batch[0][0][0][0]).size()[0],
-                                        (_prueba_batch[0][0][0][0]).size()[1], 
-                                        (_prueba_batch[0][0][0][0]).size()[2]
-                                        ).zero_()
+        #photos_tensor = torch.FloatTensor(max_length,
+                                        #(_prueba_batch[0][0][0][0]).size()[0],
+                                        #(_prueba_batch[0][0][0][0]).size()[1], 
+                                        #(_prueba_batch[0][0][0][0]).size()[2]
+                                        #).zero_()
         for p in range(nphotos):
     #        photos_tensor[p]=_prueba_batch[n][0][p][0]
 #             try:
@@ -229,4 +227,45 @@ def my_collate(batch):
 
     return((data_tensor, target))
   
-  
+def my_collate_percentile(batch):
+    _prueba_batch = batch
+    max_length=0
+    lengths=[]
+    for n in range(len(_prueba_batch)):
+        nphotos = len(_prueba_batch[n][0])
+        if nphotos > max_length:
+            max_length = nphotos
+        lengths.append(nphotos)
+#         print(nphotos)
+#     print(max_length)
+    median_length = np.ceil(np.median(np.asarray(lengths)))
+    percentile_length = int(np.ceil(np.percentile(np.asarray(lengths), 75)))
+
+
+    data_tensor = torch.FloatTensor(
+        len(_prueba_batch), 
+        percentile_length, 
+        (_prueba_batch[0][0][0][0]).size()[0], 
+        (_prueba_batch[0][0][0][0]).size()[1], 
+        (_prueba_batch[0][0][0][0]).size()[2]
+        ).zero_()
+    data_tensor.size()
+
+    for n in range(len(_prueba_batch)):
+        nphotos = len(_prueba_batch[n][0])
+        if nphotos > percentile_length:
+            rest = nphotos - percentile_length
+            rand_start = np.random.randint(rest)
+        else:
+            rand_start = 0
+            #data_tensor[n] = _prueba_batch[n][0][rand_start:(rand_start+percentile_length)][0]
+        for p in range(percentile_length):   
+            data_tensor[n][p] = _prueba_batch[n][0][(p+rand_start)%nphotos][0]
+
+
+    target = torch.LongTensor( len(_prueba_batch), 1).zero_()
+    for n in range(len(_prueba_batch)):
+        target[n] = _prueba_batch[n][1]
+
+
+    return((data_tensor, target))

@@ -101,7 +101,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.workers,
-        pin_memory=False, collate_fn=data_load.my_collate)
+        pin_memory=False, collate_fn=data_load.my_collate_percentile)
 
     val_loader = data.DataLoader(
         data_load.ImageFolderSequences(valdir,
@@ -114,7 +114,7 @@ def main():
         batch_size=int(args.batch_size/1),
         shuffle=True,
         num_workers=args.workers,
-        pin_memory=True, collate_fn=data_load.my_collate)
+        pin_memory=True, collate_fn=data_load.my_collate_percentile)
 
     test_loader = data.DataLoader(
         data_load.ImageFolderSequences(testdir,
@@ -127,7 +127,7 @@ def main():
         batch_size=1,
         shuffle=False,
         num_workers=1,
-        pin_memory=False, collate_fn=data_load.my_collate)
+        pin_memory=False, collate_fn=data_load.my_collate_percentile)
 
     if args.test:
         print("Testing the model and generating a output csv for submission")

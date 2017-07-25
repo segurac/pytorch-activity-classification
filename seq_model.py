@@ -115,7 +115,16 @@ class Vgg_face_sequence_model(nn.Module):
         
         
         
-        output = self.classifier(output[:,-1,:])
+        #output = self.classifier(output[:,-1,:])
+        
+        n_outputs = output.size()[1]
+        myweights = np.linspace(0.0, 1.0, n_outputs) #give progressive weights, from zero at start to 1 at the end of the sequence
+        myweights = myweights / np.sum(myweights)
+        outputs = []
+        for o in range(n_outputs):
+            outputs.append( self.classifier(output[:,o,:])  * myweights[o])
+        output = torch.sum(torch.stack(outputs, dim=2), dim=2).view(-1,7)
+        
         #print("output", output.size())
         #gc.collect()
         return output

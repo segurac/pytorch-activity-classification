@@ -257,10 +257,10 @@ def my_collate_percentile(batch):
             rest = nphotos - percentile_length
             rand_start = np.random.randint(rest)
         else:
-            rand_start = 0
+            rand_start = np.random.randint(nphotos)
             #data_tensor[n] = _prueba_batch[n][0][rand_start:(rand_start+percentile_length)][0]
         for p in range(percentile_length):   
-            data_tensor[n][p] = _prueba_batch[n][0][(p+rand_start)%nphotos][0]
+            data_tensor[n][p] = _prueba_batch[n][0][((p+rand_start)%nphotos + int((p+rand_start)/nphotos))%nphotos][0] #circular buffer, with one single padding image when starting over
 
 
     target = torch.LongTensor( len(_prueba_batch), 1).zero_()

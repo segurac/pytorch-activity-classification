@@ -45,6 +45,8 @@ parser.add_argument('--resume2', default='', type=str, metavar='PATH', help='pat
 parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='evaluate model on validation set')
 parser.add_argument('--test', dest='test', action='store_true', help='evaluate model on test set')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true', help='use pre-trained model')
+parser.add_argument('--cweights', default='', type=str, metavar='PATH', help='path to the file containing the list of labels')
+
 
 best_prec1 = 0
 
@@ -134,7 +136,19 @@ def main():
         test(test_loader, train_loader.dataset.class_to_idx, model)
         return
     # define loss function (criterion) and pptimizer
-    criterion = nn.CrossEntropyLoss()
+    if args.cweights != '':
+        from sklearn.utils import class_weight
+        clabels = []
+        with open(args.cweights, 'r') as stream:
+            for line in stream:
+                line=line.strip()
+                clabels.append(line)
+        class_weight = class_weight.compute_class_weight('balanced', np.unique(clabels),clabels)
+        class_weight = torch.from_numpy(class_weight).float()
+    else:
+        class_weight = None
+
+    criterion = nn.CrossEntropyLoss(weight=class_weight)
     if USE_CUDA:
         criterion.cuda()
 

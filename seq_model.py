@@ -73,8 +73,8 @@ class Vgg_face_sequence_model(nn.Module):
         ## Input is a sequence of faces for each user. batch dimension is in users (users, sequence, channels, height, width)
         
         #first get a slice for earch sequence element, get features from convolutional and store output in another sequence to feed the RNN
-      
-        seq_length = inputs.size()[1]
+        input_sizes = inputs.size() 
+        seq_length = input_sizes[1]
         seq_window = 30
         if seq_length < seq_window:
             seq_window = seq_length
@@ -88,32 +88,36 @@ class Vgg_face_sequence_model(nn.Module):
         else:
             rand_start = 0
 
-        features = []
-        for s in range(seq_window):
-            #input_slice = inputs.narrow(1,s,1).contiguous().view(-1,3,224,224).cuda()
-            #input_slice = inputs[:,s,:,:,:].cuda()
-            input_slice = inputs[:,s+rand_start,:,:,:]
-            if eval == False:
-                input_slice = torch.autograd.Variable(input_slice).cuda()
-            else:
-                input_slice = torch.autograd.Variable(input_slice, volatile=True).cuda()
-            #print("input_slice " , input_slice.size())
-            slice_features = self.vgg_face(input_slice)
-            #print("slice features " , slice_features.size())
-            features.append(slice_features)
+        if False:
+            features = []
+            for s in range(seq_window):
+                #input_slice = inputs.narrow(1,s,1).contiguous().view(-1,3,224,224).cuda()
+                #input_slice = inputs[:,s,:,:,:].cuda()
+                input_slice = inputs[:,s+rand_start,:,:,:]
+                if eval == False:
+                    input_slice = torch.autograd.Variable(input_slice).cuda()
+                else:
+                    input_slice = torch.autograd.Variable(input_slice, volatile=True).cuda()
+                slice_features = self.vgg_face(input_slice)
+                features.append(slice_features)
+                
             
-        #gc.collect()
-        
-        ## concatenate in (batch, sequence, features)
-        features = torch.stack(features, dim=1)
-        #print("features " , features.size())
+            ## concatenate in (batch, sequence, features)
+            features = torch.stack(features, dim=1)
+
+        else:
+            all_faces = inputs.narrow(1,rand_start,seq_window).contiguous().view(input_sizes[0] * seq_window, input_sizes[2], input_sizes[3], input_sizes[4])
+
+            if eval == False:
+                all_faces = torch.autograd.Variable(all_faces).cuda()
+            else:
+                all_faces = torch.autograd.Variable(all_faces, volatile=True).cuda()
+
+            all_features = self.vgg_face(all_faces)
+            features = all_features.view(input_sizes[0], seq_window, -1)
 
         ## feed to the RNN
         output, hidden = self.rnn(features, hidden)
-        #print("output", output.size())   
-        #print("output[:,-1,:]", output[:,-1,:].size())
-        
-        
         
         #output = self.classifier(output[:,-1,:])
         

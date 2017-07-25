@@ -46,6 +46,7 @@ parser.add_argument('--evaluate', dest='evaluate', action='store_true', help='ev
 parser.add_argument('--test', dest='test', action='store_true', help='evaluate model on test set')
 parser.add_argument('--pretrained', dest='pretrained', action='store_true', help='use pre-trained model')
 parser.add_argument('--cweights', default='', type=str, metavar='PATH', help='path to the file containing the list of labels')
+parser.add_argument('--softbatch', default=18, type=int, metavar='N', help='optimize parameters afer softbatch/batch_size samples')
 
 
 best_prec1 = 0
@@ -60,9 +61,9 @@ def main():
 
     # create model
     if args.resume2:
-        model = seq_model.Vgg_face_sequence_model(nhid=128, nlayers=1, dropout=0.5, pretrained_model_path = args.resume2)
+        model = seq_model.Vgg_face_sequence_model(nhid=512, nlayers=2, dropout=0.5, pretrained_model_path = args.resume2)
     else:
-        model = seq_model.Vgg_face_sequence_model(nhid=128, nlayers=1, dropout=0.5)
+        model = seq_model.Vgg_face_sequence_model(nhid=512, nlayers=2, dropout=0.5)
     #model = torch.nn.DataParallel(model).cuda()
     if USE_CUDA:
         model = model.cuda()
@@ -76,25 +77,41 @@ def main():
             best_prec1 = checkpoint['best_prec1']
             model.load_state_dict(checkpoint['state_dict'])
             print("=> loaded checkpoint '{}' (epoch {})".format(args.evaluate, checkpoint['epoch']))
+            
+            
+            for m in model.modules():
+                print(m)
+                if isinstance(m, nn.Linear):
+                    if next(m.parameters()).size()[0] == 64:
+                        print("making last layer of feature extractor trainable")
+                        for p in m.parameters():
+                            p.requires_grad = True
+                        break
+
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
 
     # Data loading code
-    #traindir = os.path.join(args.data, 'train')
+    #traindir = os.path.join(args.data, 'train')       
+
     #valdir = os.path.join(args.data, 'val')
     #testdir = os.path.join(args.data, 'test')
-    traindir ='/mnt/8T-NAS/data/2017_EmotiW/Train_AFEW/AlignedFaces_LBPTOP_Points/Faces/'
-    valdir ='/mnt/8T-NAS/data/2017_EmotiW/Val_AFEW/AlignedFaces_LBPTOP_Points_Val/Faces/'
-    testdir ='/mnt/8T-NAS/data/2017_EmotiW/Val_AFEW/AlignedFaces_LBPTOP_Points_Val/Faces/'
+    #traindir ='/mnt/8T-NAS/data/2017_EmotiW/Train_AFEW/AlignedFaces_LBPTOP_Points/Faces/'
+    traindir = '/disks/md0-4T/users/csp/2017_EmotiW/Train_AFEW/AlignedFaces_LBPTOP_Points/Faces'
+    #valdir ='/mnt/8T-NAS/data/2017_EmotiW/Val_AFEW/AlignedFaces_LBPTOP_Points_Val/Faces/'
+    valdir = '/disks/md0-4T/users/csp/2017_EmotiW/Val_AFEW/AlignedFaces_LBPTOP_Points_Val/Faces'
+    #testdir ='/mnt/8T-NAS/data/2017_EmotiW/Val_AFEW/AlignedFaces_LBPTOP_Points_Val/Faces/'
+    testdir = '/disks/md0-4T/users/csp/2017_EmotiW/Val_AFEW/AlignedFaces_LBPTOP_Points_Val/Faces'
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     train_loader = data.DataLoader(
         data_load.ImageFolderSequences(traindir,
                              transforms.Compose([
-                                 transforms.Scale(240),
+                                 transforms.Scale(224),
+                                 transforms.Pad(16),
                                  transforms.RandomSizedCrop(224),
                                  transforms.RandomHorizontalFlip(),
                                  transforms.ToTensor(),
@@ -108,7 +125,8 @@ def main():
     val_loader = data.DataLoader(
         data_load.ImageFolderSequences(valdir,
                              transforms.Compose([
-                                 transforms.Scale(240),
+                                 transforms.Scale(224),
+                                 transforms.Pad(16),
                                  transforms.CenterCrop(224),
                                  transforms.ToTensor(),
                                  normalize,
@@ -121,8 +139,8 @@ def main():
     test_loader = data.DataLoader(
         data_load.ImageFolderSequences(testdir,
                         transforms.Compose([
-                            transforms.Scale(240),
-                            transforms.CenterCrop(224),
+                            transforms.Scale(224),
+                            #transforms.CenterCrop(224),
                             transforms.ToTensor(),
                             normalize,
                         ])),
@@ -191,7 +209,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
     # switch to train mode
     model.train()
     
-    soft_batch = 3
+    soft_batch = int(np.ceil(args.softbatch/args.batch_size))
     #acc_loss = 0
     optimizer.zero_grad()
 

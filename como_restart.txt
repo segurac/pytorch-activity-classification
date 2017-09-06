@@ -1,0 +1,2 @@
+python main_sequence.py -b 6 --resume2 vg_face_model/model_best.pth.tar data/
+

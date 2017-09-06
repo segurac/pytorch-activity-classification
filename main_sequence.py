@@ -85,7 +85,7 @@ def main():
                     if next(m.parameters()).size()[0] == 64:
                         print("making last layer of feature extractor trainable")
                         for p in m.parameters():
-                            p.requires_grad = True
+                            p.requires_grad = False
                         break
 
         else:

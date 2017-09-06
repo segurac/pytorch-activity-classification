@@ -88,7 +88,7 @@ class Vgg_face_sequence_model(nn.Module):
         else:
             rand_start = 0
 
-        if False:
+        if True:
             features = []
             for s in range(seq_window):
                 #input_slice = inputs.narrow(1,s,1).contiguous().view(-1,3,224,224).cuda()
@@ -121,13 +121,22 @@ class Vgg_face_sequence_model(nn.Module):
         
         #output = self.classifier(output[:,-1,:])
         
+        #progressive weights
+        #n_outputs = output.size()[1]
+        #myweights = np.linspace(0.0, 1.0, n_outputs) #give progressive weights, from zero at start to 1 at the end of the sequence
+        #myweights = myweights / np.sum(myweights)
+        #outputs = []
+        #for o in range(n_outputs):
+            #outputs.append( self.classifier(output[:,o,:])  * myweights[o])
+        #output = torch.sum(torch.stack(outputs, dim=2), dim=2).view(-1,7)
+        
         n_outputs = output.size()[1]
-        myweights = np.linspace(0.0, 1.0, n_outputs) #give progressive weights, from zero at start to 1 at the end of the sequence
-        myweights = myweights / np.sum(myweights)
         outputs = []
         for o in range(n_outputs):
-            outputs.append( self.classifier(output[:,o,:])  * myweights[o])
-        output = torch.sum(torch.stack(outputs, dim=2), dim=2).view(-1,7)
+            outputs.append( self.classifier(output[:,o,:])  )
+        output = torch.mean(torch.stack(outputs, dim=2), dim=2).view(-1,7)
+        
+        
         
         #print("output", output.size())
         #gc.collect()
